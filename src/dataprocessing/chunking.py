@@ -1,23 +1,74 @@
 from typing import Optional
-
 import numpy as np
+from src.constants import Point_t
 
 
-class ChunkNode:
-    def __init__(self, parent):
-        self.parent: Optional[ChunkNode] = parent
-        self.points: Optional[np.array] = None
-        self.children: list[list[ChunkNode]] = [[], []]
-        self.split_x: Optional[float] = None
-        self.split_y: Optional[float] = None
+class ChunkSpace:
+    MAX_OFFSET = 1.0001
 
+    def __init__(self, x_cells: int, y_cells: int):
+        self.chunks: Optional[np.ndarray] = None
+        self.x_cells = x_cells
+        self.y_cells = y_cells
+        self.cell_count = x_cells * y_cells
 
-class ChunkTree:
-    def __init__(self):
-        self.root = ChunkNode(None)
+        self.edges = np.empty((self.x_cells, self.y_cells), dtype=list)
+        self.connected = np.zeros((self.x_cells, self.y_cells), dtype=bool)
+
+    def clear_edge_info(self):
+        self.edges = np.empty((self.x_cells, self.y_cells), dtype=list)
+        self.connected = np.zeros((self.x_cells, self.y_cells), dtype=bool)
+
+    def put_edge(self, edge: tuple[tuple[int, int], tuple[int, int]]):
+        src, dest = edge
+        if self.edges[src] is None:
+            self.edges[src] = [dest]
+        else:
+            self.edges[src].append(dest)
+
+        if self.edges[dest] is None:
+            self.edges[dest] = [src]
+        else:
+            self.edges[dest].append(src)
+
+        self.connected[src] = True
+        self.connected[dest] = True
 
     def put_points(self, points: np.array):
-        self._point_splitter_recursive(points, self.root)
+        self.chunks = np.empty((self.x_cells, self.y_cells), object)
+        min_x = np.min(points["X"])
+        max_x = np.max(points["X"]) * ChunkSpace.MAX_OFFSET
+        min_y = np.min(points["Y"])
+        max_y = np.max(points["Y"]) * ChunkSpace.MAX_OFFSET
 
-    def _point_splitter_recursive(self, points: np.array, current_node: ChunkNode):
-        pass
+        for point in points:
+            x, y = point["X"], point["Y"]
+            x_index = np.floor((x - min_x) / (max_x - min_x) * self.x_cells).astype(int)
+            y_index = np.floor((y - min_y) / (max_y - min_y) * self.y_cells).astype(int)
+
+            if self.chunks[x_index, y_index]:
+                self.chunks[x_index, y_index] = np.append(self.chunks[x_index, y_index], point)
+            else:
+                self.chunks[x_index, y_index] = np.array([point], dtype=Point_t)
+
+    def get_neighbors(self, chunk: tuple[int, int]):
+        out = {(max(0, chunk[0] - 1), chunk[1]),
+               (min(self.x_cells - 1, chunk[0] + 1), chunk[1]),
+               (chunk[0], max(0, chunk[1] - 1)),
+               (chunk[0], min(self.y_cells - 1, chunk[1] + 1))}
+        if chunk in out:
+            out.remove(chunk)
+        return out
+
+    def get_all_possible_edges(self):
+        out = []
+        for x in range(self.x_cells):
+            for y in range(self.y_cells):
+                if x < self.x_cells - 1:
+                    out.append(((x, y), (x + 1, y)))
+                if y < self.y_cells - 1:
+                    out.append(((x, y), (x, y + 1)))
+        return out
+
+    def get_all_edges_number_fast(self):
+        return (self.x_cells - 1) * (self.y_cells - 1) * 2 + (self.x_cells - 1) + (self.y_cells - 1)
