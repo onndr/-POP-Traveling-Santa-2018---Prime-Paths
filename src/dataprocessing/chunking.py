@@ -12,28 +12,6 @@ class ChunkSpace:
         self.y_cells = y_cells
         self.cell_count = x_cells * y_cells
 
-        self.edges = np.empty((self.x_cells, self.y_cells), dtype=list)
-        self.connected = np.zeros((self.x_cells, self.y_cells), dtype=bool)
-
-    def clear_edge_info(self):
-        self.edges = np.empty((self.x_cells, self.y_cells), dtype=list)
-        self.connected = np.zeros((self.x_cells, self.y_cells), dtype=bool)
-
-    def put_edge(self, edge: tuple[tuple[int, int], tuple[int, int]]):
-        src, dest = edge
-        if self.edges[src] is None:
-            self.edges[src] = [dest]
-        else:
-            self.edges[src].append(dest)
-
-        if self.edges[dest] is None:
-            self.edges[dest] = [src]
-        else:
-            self.edges[dest].append(src)
-
-        self.connected[src] = True
-        self.connected[dest] = True
-
     def put_points(self, points: np.array):
         self.chunks = np.empty((self.x_cells, self.y_cells), object)
         min_x = np.min(points["X"])
