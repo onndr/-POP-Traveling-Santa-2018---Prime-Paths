@@ -23,4 +23,6 @@ class Graph:
         return self.edges
 
     def get_node_edges(self, node):
+        if node not in self.edges:
+            self.edges[node] = set()
         return self.edges[node]

@@ -22,3 +22,5 @@ def test_graph_simple():
     assert graph.get_node_edges(p2) == {p1}
     assert len(graph.get_node_edges(p4)) == 0
     assert graph.get_node_edges(p1) == {p2, p3}
+
+    assert len(graph.get_node_edges(p6)) == 0
