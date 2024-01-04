@@ -13,7 +13,7 @@ def get_primes(filename: str = PRIMES_FILE_PATH) -> np.array:
         return np.array(list(map(int, file.readline().strip().split(", "))))
 
 
-def read_cities_data(filename: str = CITY_DATA_FILE_PATH, restrict: Optional[int] = None) -> np.array:
+def read_cities_data(filename: str = CITY_DATA_FILE_PATH, restrict: Optional[int] = None, primes_filename: str = PRIMES_FILE_PATH) -> np.array:
     raw_cities = np.genfromtxt(filename, delimiter=',', names=True, dtype=PointRaw_t)
     if restrict:
         raw_cities = raw_cities[:restrict]
@@ -21,7 +21,7 @@ def read_cities_data(filename: str = CITY_DATA_FILE_PATH, restrict: Optional[int
     for field in PointRaw_t.fields:
         cities[field] = raw_cities[field]
 
-    primes = get_primes()
+    primes = get_primes(primes_filename)
     j = 0
     for i in range(cities.shape[0]):
         city_id = cities[i]["CityId"]
