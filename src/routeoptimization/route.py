@@ -24,78 +24,141 @@ class Route:
     @staticmethod
     def total_distance(points: np.array, order: np.array):
         total = 0
-        for i in range(-1, len(points)-1):
+        for i in range(-1, len(points) - 1):
             total += Route.distance(points[order[i]], points[order[i + 1]])
         return total
 
     @staticmethod
     def two_opt(points: np.array, n_points: int, order: np.array, iters: int):
         best_distance = Route.total_distance(points, order)
+
+        def gain_from_2_opt_swap(x1, x2, y1, y2):
+            old_len = Route.distance(points[x1], points[x2]) + Route.distance(points[y1], points[y2])
+            new_len = Route.distance(points[x1], points[y1]) + Route.distance(points[x2], points[y2])
+            return old_len - new_len
+
         for _ in range(iters):
-            for i in range(1, n_points - 1):
-                for j in range(i + 1, n_points):
-                    new_order = np.concatenate((order[:i], order[i:j + 1][::-1], order[j + 1:]))    # swap
+            i = random.randint(0, n_points - 3)
+            x1 = order[i]
+            x2 = order[i + 1 % n_points]
+
+            if i == 0:
+                j_limit = n_points - 2
+            else:
+                j_limit = n_points - 1
+
+            j = random.randint(i + 2, j_limit)
+            y1 = order[j]
+            y2 = order[(j + 1) % n_points]
+
+            if gain_from_2_opt_swap(x1, x2, y1, y2) > 0:
+                new_order = np.concatenate((order[:i + 1], order[i + 1:j + 1][::-1], order[j + 1:]))
+                new_distance = Route.total_distance(points, new_order)
+                if new_distance <= best_distance:
+                    order = new_order
+                    best_distance = new_distance
+
+        return order, best_distance
+
+    @staticmethod
+    def three_opt(points: np.array, n_points: int, order: np.array, iters: int):
+        def gain_from_3_opt_swap(x1, x2, y1, y2, z1, z2, opt_recombination):
+            old_len = 0
+            new_len = 0
+            match opt_recombination:
+                case 0:
+                    return 0
+                case 1:
+                    old_len = Route.distance(points[x1], points[x2]) + Route.distance(points[z1], points[z2])
+                    new_len = Route.distance(points[x1], points[z1]) + Route.distance(points[x2], points[z2])
+                case 2:
+                    old_len = Route.distance(points[y1], points[y2]) + Route.distance(points[z1], points[z2])
+                    new_len = Route.distance(points[y1], points[z1]) + Route.distance(points[y2], points[z2])
+                case 3:
+                    old_len = Route.distance(points[x1], points[x2]) + Route.distance(points[y1], points[y2])
+                    new_len = Route.distance(points[x1], points[y1]) + Route.distance(points[x2], points[y2])
+                case 4:
+                    new_len = (Route.distance(points[x1], points[y1]) +
+                               Route.distance(points[x2], points[z1]) +
+                               Route.distance(points[y2], points[z2]))
+                case 5:
+                    new_len = (Route.distance(points[x1], points[z1]) +
+                               Route.distance(points[y2], points[x2]) +
+                               Route.distance(points[y1], points[z2]))
+                case 6:
+                    new_len = (Route.distance(points[x1], points[y2]) +
+                               Route.distance(points[z1], points[y1]) +
+                               Route.distance(points[x2], points[z2]))
+                case 7:
+                    new_len = (Route.distance(points[x1], points[y2]) +
+                               Route.distance(points[z1], points[x2]) +
+                               Route.distance(points[y1], points[z2]))
+                case _:
+                    raise ValueError("Invalid opt_recombination value")
+
+            if opt_recombination in [4, 5, 6, 7]:
+                old_len = (Route.distance(points[x1], points[x2]) +
+                           Route.distance(points[y1], points[y2]) +
+                           Route.distance(points[z1], points[z2]))
+
+            return old_len - new_len
+
+        def three_opt_recombine(order, i, j, k, opt_recombination):
+            segment1 = np.concatenate((order[k + 1 % n_points:], order[:i + 1 % n_points]))
+            segment2 = order[i + 1 % n_points: j + 1 % n_points]
+            segment3 = order[j + 1 % n_points: k + 1 % n_points]
+
+            match opt_recombination:
+                case 0:
+                    return order
+                case 1:
+                    segment1 = segment1[::-1]
+                case 2:
+                    segment3 = segment3[::-1]
+                case 3:
+                    segment2 = segment2[::-1]
+                case 4:
+                    segment3 = segment3[::-1]
+                    segment2 = segment2[::-1]
+                case 5:
+                    segment1 = segment1[::-1]
+                    segment2 = segment2[::-1]
+                case 6:
+                    segment1 = segment1[::-1]
+                    segment3 = segment3[::-1]
+                case 7:
+                    segment1 = segment1[::-1]
+                    segment2 = segment2[::-1]
+                    segment3 = segment3[::-1]
+                case _:
+                    raise ValueError("Invalid opt_recombination value")
+
+            return np.concatenate((segment1, segment2, segment3))
+
+        best_distance = Route.total_distance(points, order)
+        for _ in range(iters):
+            i = random.randint(0, n_points - 1)
+            x1 = order[i]
+            x2 = order[(i + 1) % n_points]
+
+            j = random.randint(i + 1, i + n_points - 3) % n_points
+            y1 = order[j]
+            y2 = order[(j + 1) % n_points]
+
+            k = random.randint(i + 2, i + n_points - 1) % n_points
+            z1 = order[k]
+            z2 = order[(k + 1) % n_points]
+
+            i, j, k = sorted([i, j, k])
+
+            for opt_recombination in range(1, 8):
+                if gain_from_3_opt_swap(x1, x2, y1, y2, z1, z2, opt_recombination) > 0:
+                    new_order = three_opt_recombine(order, i, j, k, opt_recombination)
                     new_distance = Route.total_distance(points, new_order)
                     if new_distance <= best_distance:
                         order = new_order
                         best_distance = new_distance
-        return order, best_distance
 
-    @staticmethod
-    def three_opt_pick_best_variation(points, order, i, j, k):
-        """ beauty is in the eye of the beholder """
-        segment1 = order[:i]
-        segment2 = order[i:j]
-        segment3 = order[j:k]
-        segment4 = order[k:]
-
-        r1 = np.concatenate((segment1, segment2, segment3, segment4))
-        r2 = np.concatenate((segment1, segment3, segment2, segment4))
-        r3 = np.concatenate((segment1, segment2[::-1], segment3, segment4))
-        r4 = np.concatenate((segment1, segment3[::-1], segment2, segment4))
-        r5 = np.concatenate((segment1, segment2, segment4[::-1], segment3))
-        r6 = np.concatenate((segment1, segment3, segment4[::-1], segment2))
-        r7 = np.concatenate((segment1, segment4[::-1], segment2[::-1], segment3))
-        r8 = np.concatenate((segment1, segment4[::-1], segment3[::-1], segment2))
-
-        d1 = Route.total_distance(points, r1)
-        d2 = Route.total_distance(points, r2)
-        d3 = Route.total_distance(points, r3)
-        d4 = Route.total_distance(points, r4)
-        d5 = Route.total_distance(points, r5)
-        d6 = Route.total_distance(points, r6)
-        d7 = Route.total_distance(points, r7)
-        d8 = Route.total_distance(points, r8)
-
-        min_distance = min(d1, d2, d3, d4, d5, d6, d7, d8)
-
-        if min_distance == d1:
-            return r1, d1
-        elif min_distance == d2:
-            return r2, d2
-        elif min_distance == d3:
-            return r3, d3
-        elif min_distance == d4:
-            return r4, d4
-        elif min_distance == d5:
-            return r5, d5
-        elif min_distance == d6:
-            return r6, d6
-        elif min_distance == d7:
-            return r7, d7
-        return r8, d8
-
-    @staticmethod
-    def three_opt(points: np.array, n_points: int, order: np.array, iters: int):
-        best_distance = Route.total_distance(points, order)
-        for _ in range(iters):
-            for i in range(1, n_points - 3):
-                for j in range(i + 2, n_points - 1):
-                    for k in range(j + 2, n_points):
-                        new_order, new_distance = Route.three_opt_pick_best_variation(points, order, i, j, k)
-                        if new_distance < best_distance:
-                            order = new_order
-                            best_distance = new_distance
         return order, best_distance
 
     def _generate_random_solutions(self, n_solutions: int) -> list:
@@ -121,13 +184,13 @@ class Route:
             if distance <= self.best_cost:
                 self.best_order = order
                 self.best_cost = distance
-                self.graph = None   # lazy graph, only recreated on request
+                self.graph = None  # lazy graph, only recreated on request
         return self.best_order, self.best_cost
 
     def get_graph(self) -> Graph:
         if not self.graph:
             self.graph = Graph()
-            for i in range(-1, self.n_points-1):
-                self.graph.add_edge(self.points[self.best_order[i]], self.points[self.best_order[i+1]])
+            for i in range(-1, self.n_points - 1):
+                self.graph.add_edge(self.points[self.best_order[i]], self.points[self.best_order[i + 1]])
 
         return self.graph

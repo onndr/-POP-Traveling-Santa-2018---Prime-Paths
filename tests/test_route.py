@@ -14,19 +14,21 @@ import numpy as np
 # p6 = (5, 1, 5, True)
 # points = [p1, p2, p3, p4, p5, p6]
 # np_points = np.array(points, dtype=Point_t)
-cities = read_cities_data(filename="../cities.csv", restrict=10, primes_filename="../primes.txt")
+cities = read_cities_data(filename="../cities.csv", restrict=50, primes_filename="../primes.txt")[10:]
 
 def test_route_two_opt_simple():
     route = Route(cities)
 
     assert route.graph is None
-    assert route.n_points == 10
+    assert route.n_points == 40
     init_cost = route.best_cost
-    order, cost = route.optimize(Route.two_opt, 1, 5)
+    order, cost = route.optimize(Route.two_opt, 1000, 5)
     assert math.isclose(cost, route.best_cost)
     assert cost < init_cost
     print("Two opt")
     print(init_cost, cost)
+    print("Route")
+    print(len(route.best_order))
     print("_________")
 
 
@@ -34,13 +36,15 @@ def test_route_three_opt_simple():
     route = Route(cities)
 
     assert route.graph is None
-    assert route.n_points == 10
+    assert route.n_points == 40
     init_cost = route.best_cost
-    order, cost = route.optimize(Route.three_opt, 1, 5)
+    order, cost = route.optimize(Route.three_opt, 1000, 5)
     assert math.isclose(cost, route.best_cost)
     assert cost < init_cost
     print("Three opt")
     print(init_cost, cost)
+    print("Route")
+    print(len(route.best_order))
     print("_________")
 
 
