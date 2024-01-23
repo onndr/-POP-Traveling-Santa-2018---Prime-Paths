@@ -22,10 +22,13 @@ class Route:
         return np.sqrt((point2['X'] - point1['X']) ** 2 + (point2['Y'] - point1['Y']) ** 2)
 
     @staticmethod
-    def total_distance(points: np.array, order: np.array):
+    def total_distance(points: np.array, order: np.array, with_primes_penalty: bool = False):
         total = 0
         for i in range(-1, len(points) - 1):
-            total += Route.distance(points[order[i]], points[order[i + 1]])
+            if with_primes_penalty and i % 10 == 0 and not points[order[i]]['prime']:
+                total += Route.distance(points[order[i]], points[order[i + 1]]) * 1.1
+            else:
+                total += Route.distance(points[order[i]], points[order[i + 1]])
         return total
 
     @staticmethod
