@@ -1,12 +1,13 @@
-import pandas as pd
-from matplotlib import pyplot as plt
+import logging
 
-from src.dataprocessing.initialparse import read_cities_data
+from src.primepathsproblem import PrimePathsProblem
 
 
 def main():
-    data = read_cities_data()
-    pass
+    logging.basicConfig(level=logging.INFO, format='%(asctime)s.%(msecs)03d [%(levelname)s] - %(message)s',
+                        datefmt='%Y-%m-%d %H:%M:%S')
+    problem = PrimePathsProblem()
+    problem.solve()
 
 
 if __name__ == "__main__":
