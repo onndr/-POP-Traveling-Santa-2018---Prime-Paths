@@ -172,16 +172,20 @@ class Route:
             solutions.append(order)
         return solutions
 
-    def _prepare_start_solutions(self, n_start_routes: int = 3, use_prev_best_solution=True):
+    def _prepare_start_solutions(self, n_start_routes: int = 3, use_prev_best_solution=True,
+                                 copy_prev_best_solution=True):
         if use_prev_best_solution:
-            init_orders = self._generate_random_solutions(max(n_start_routes, 1) - 1)
-            init_orders.append(self.best_order)
-        else:
-            init_orders = self._generate_random_solutions(max(n_start_routes, 1))
-        return init_orders
+            if copy_prev_best_solution:
+                return [self.best_order.copy() for _ in range(n_start_routes)]
+            else:
+                init_orders = self._generate_random_solutions(n_start_routes - 1)
+                init_orders.append(self.best_order)
+                return init_orders
+        return self._generate_random_solutions(n_start_routes)
 
-    def optimize(self, kopt_alg: Callable, iters: int = 100, n_start_routes: int = 3, use_prev_best_solution=True):
-        init_orders = self._prepare_start_solutions(n_start_routes, use_prev_best_solution)
+    def optimize(self, kopt_alg: Callable, iters: int = 100, n_start_routes: int = 3, use_prev_best_solution=True,
+                 copy_prev_best_solution=True):
+        init_orders = self._prepare_start_solutions(n_start_routes, use_prev_best_solution, copy_prev_best_solution)
         for order in init_orders:
             order, distance = kopt_alg(self.points, self.n_points, order, iters)
             if distance <= self.best_cost:
