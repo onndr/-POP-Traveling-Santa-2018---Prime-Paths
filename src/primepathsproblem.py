@@ -5,6 +5,7 @@ import queue
 from typing import Optional
 
 import matplotlib.pyplot as plt
+import numpy as np
 
 from src.dataprocessing.initialparse import read_cities_data
 from src.constants import PRIMES_FILE_PATH, CITY_DATA_FILE_PATH
@@ -179,20 +180,22 @@ class PrimePathsProblem:
     def solve(self):
         self.read_problem_data(self.city_count_restriction)
         self.organize_data_into_chunks(self.x_chunks, self.y_chunks)
-        routes = self.create_routes_within_chunks()
-        initial_route = self.create_connections_between_chunks(routes)
-
-        with open("initial_route_cache.bin", "wb") as file:
-            pickle.dump(initial_route, file)
+        # routes = self.create_routes_within_chunks()
+        # initial_route = self.create_connections_between_chunks(routes)
+        #
+        # with open("initial_route_cache.bin", "wb") as file:
+        #     pickle.dump(initial_route, file)
         #
         # initial_route = None
         # with open("initial_route_cache.bin", "rb") as file:
         #     initial_route = pickle.load(file)
-
-        results = self.kopt_full_path(initial_route)
-
-        with open("results_cache.bin", "wb") as file:
-            pickle.dump(initial_route, file)
+        #
+        # results = self.kopt_full_path(initial_route)
+        #
+        # with open("results_cache.bin", "wb") as file:
+        #     pickle.dump(results, file)
+        with open("results_cache.bin", "rb") as file:
+            results = pickle.load(file)
 
         self.plot_results(results)
 
@@ -280,13 +283,29 @@ class PrimePathsProblem:
         return g
 
     def plot_results(self, results):
-        graph_data = []
-        for i in range(self.final_optimization_iters):
-            graph_data.append(min([result[2][i] for result in results]))
+        logging.info("Preparing data for plotting")
+        RELATIVE_OFFSET = self.x_chunks * self.y_chunks * self.chunk_start_routes / self.final_opt_routes * self.chunk_optimization_iters
+        soultion_x_vals = np.arange(RELATIVE_OFFSET, self.final_optimization_iters + RELATIVE_OFFSET)
 
-        for result in results:
-            plt.plot(result[2])
-        plt.show()
+        graph_data_min = []
+        graph_data_avg = []
+        graph_data_std = []
+        for i in range(0, self.final_optimization_iters, 1000):
+            graph_data_min.append(np.min([result[2][i] for result in results]))
+            graph_data_avg.append(np.average([result[2][i] for result in results]))
+            graph_data_std.append(np.std([result[2][i] for result in results]))
+
+        plt.figure(figsize=(7, 5))
+        logging.info("Plotting data")
+        plt.plot(soultion_x_vals[::1000], graph_data_min, label=f"Solution min")
+        plt.errorbar(soultion_x_vals[::100000], graph_data_avg[::100], graph_data_std[::100], label="Averages over 12 runs")
+        plt.xlabel("Iteration")
+        plt.ylabel("Length of path")
+        plt.title("Algorithm comparison")
+        plt.legend()
+
+        plt.savefig("porownanie.png", dpi=300)
+        # plt.show()
 
     def solve_2_opt_only(self):
         self.read_problem_data(self.city_count_restriction)
@@ -302,4 +321,4 @@ class PrimePathsProblem:
         with open("[2-opt only]results_cache.bin", "wb") as file:
             pickle.dump(results, file)
 
-        self.plot_results(results)
+        return results
