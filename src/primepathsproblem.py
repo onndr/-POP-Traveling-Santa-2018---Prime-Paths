@@ -1,7 +1,10 @@
 import logging
 import multiprocessing
+import pickle
 import queue
 from typing import Optional
+
+import matplotlib.pyplot as plt
 
 from src.dataprocessing.initialparse import read_cities_data
 from src.constants import PRIMES_FILE_PATH, CITY_DATA_FILE_PATH
@@ -15,12 +18,24 @@ from src.constants import *
 
 class PrimePathsProblem:
     def __init__(self):
-        self.inter_chunk_connection_trials = 1000
+        self.inter_chunk_connection_trials = 1500
         self.y_chunks = 15
         self.x_chunks = 15
-        self.city_count_restriction = 10000
+        self.city_count_restriction = 20000
         self.chunk_start_routes = 5
-        self.chunk_optimization_iters = 100
+        self.chunk_optimization_iters = 50000
+        self.final_opt_routes = 12
+        self.final_optimization_iters = 10000000
+
+        # self.inter_chunk_connection_trials = 50
+        # self.y_chunks = 5
+        # self.x_chunks = 5
+        # self.city_count_restriction = 2000
+        # self.chunk_start_routes = 3
+        # self.chunk_optimization_iters = 100
+        # self.final_opt_routes = 4
+        # self.final_optimization_iters = 500
+
         self.chunk_space: Optional[ChunkSpace] = None
         self.cities = None
 
@@ -140,17 +155,42 @@ class PrimePathsProblem:
                     q.put(neighbour_pos)
         return initial_route
 
-    def kopt_full_path(self, initial_route: list):
+    def kopt_full_path(self, initial_route: np.array):
         logging.info("Performing Kopt on initial route")
-        pass
+
+        processing_data = [initial_route for _ in range(self.final_opt_routes)]
+
+        res = []
+        with multiprocessing.Pool(processes=multiprocessing.cpu_count()) as pool:
+            res = pool.map(self.optimize_instance, processing_data)
+        #
+        # for data in processing_data:
+        #     res.append(self.optimize_instance(data))
+
+        return res
+
+    def optimize_instance(self, initial_route: np.array):
+        return Route.two_opt_stat(self.cities, len(self.cities), initial_route, self.final_optimization_iters)
 
     def solve(self):
         self.read_problem_data(self.city_count_restriction)
-        # Do only the things that have not been cached yet
         self.organize_data_into_chunks(self.x_chunks, self.y_chunks)
         routes = self.create_routes_within_chunks()
         initial_route = self.create_connections_between_chunks(routes)
-        self.kopt_full_path(initial_route)
+
+        with open("initial_route_cache.bin", "wb") as file:
+            pickle.dump(initial_route, file)
+        #
+        # initial_route = None
+        # with open("initial_route_cache.bin", "rb") as file:
+        #     initial_route = pickle.load(file)
+
+        results = self.kopt_full_path(initial_route)
+
+        with open("results_cache.bin", "wb") as file:
+            pickle.dump(initial_route, file)
+
+        self.plot_results(results)
 
     def get_best_connection(self, this_pos: ChunkPosType, neighbour_pos: ChunkPosType, chunk_routes: dict):
         this_path = chunk_routes[this_pos]
@@ -178,31 +218,35 @@ class PrimePathsProblem:
         return best_cost_delta, best_connection
 
     def process_random_connection(self, this_path, neighbour_path, separated_cost):
-        this_it = np.random.randint(low=0, high=len(this_path))
-        this_city = this_path[this_it]
+        try:
+            this_it = np.random.randint(low=0, high=len(this_path))
+            this_city = this_path[this_it]
 
-        neigh_it = np.random.randint(low=0, high=len(neighbour_path))
-        neigh_city = neighbour_path[neigh_it]
+            neigh_it = np.random.randint(low=0, high=len(neighbour_path))
+            neigh_city = neighbour_path[neigh_it]
 
-        this_shifed = np.append(this_path[-this_it:], this_path[:-this_it])
-        neigh_shifed = np.append(neighbour_path[-neigh_it:], neighbour_path[:-neigh_it])
+            this_shifed = np.append(this_path[-this_it:], this_path[:-this_it])
+            neigh_shifed = np.append(neighbour_path[-neigh_it:], neighbour_path[:-neigh_it])
 
-        # 1st possibility, same direction splice
-        final_1 = np.append(this_shifed, neigh_shifed)
-        final_1_dist = Route.total_distance(self.cities, final_1)
-        cost_delta = final_1_dist - separated_cost
+            # 1st possibility, same direction splice
+            final_1 = np.append(this_shifed, neigh_shifed)
+            final_1_dist = Route.total_distance(self.cities, final_1)
+            cost_delta = final_1_dist - separated_cost
 
-        local_best_con = (this_city, neigh_city, 1)
-        local_best_cost = cost_delta
-
-        # 2nd possibility, inverded direction
-        final_2 = np.append(this_shifed, np.flip(neigh_shifed))
-        final_2_dist = Route.total_distance(self.cities, final_2)
-        cost_delta = final_2_dist - separated_cost
-
-        if cost_delta < local_best_cost:
-            local_best_con = (this_city, neigh_city, -1)
+            local_best_con = (this_city, neigh_city, 1)
             local_best_cost = cost_delta
+
+            # 2nd possibility, inverded direction
+            final_2 = np.append(this_shifed, np.flip(neigh_shifed))
+            final_2_dist = Route.total_distance(self.cities, final_2)
+            cost_delta = final_2_dist - separated_cost
+
+            if cost_delta < local_best_cost:
+                local_best_con = (this_city, neigh_city, -1)
+                local_best_cost = cost_delta
+        except Exception as e:
+            logging.error(f"{e}")
+            return 1e18, None
 
         return local_best_cost, local_best_con
 
@@ -230,3 +274,12 @@ class PrimePathsProblem:
         for connection in connections:
             g.add_edge(connection[0], connection[1])
         return g
+
+    def plot_results(self, results):
+        graph_data = []
+        for i in range(self.final_optimization_iters):
+            graph_data.append(min([result[2][i] for result in results]))
+
+        for result in results:
+            plt.plot(result[2])
+        plt.show()

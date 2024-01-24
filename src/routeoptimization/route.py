@@ -77,6 +77,59 @@ class Route:
         return order, best_distance
 
     @staticmethod
+    def two_opt_stat(points: np.array, n_points: int, order: np.array, iters: int):
+        best_distance = Route.total_distance(points, order)
+
+        def gain_from_2_opt_swap(x1, x2, y1, y2):
+            point_ = points[x1]
+            point_1 = points[x2]
+            point_2 = points[y1]
+            point_3 = points[y2]
+            old_len = np.sqrt((point_1['X'] - point_['X']) ** 2 + (point_1['Y'] - point_['Y']) ** 2) + np.sqrt(
+                (point_3['X'] - point_2['X']) ** 2 + (
+                        point_3['Y'] - point_2['Y']) ** 2)
+            point_4 = points[x1]
+            point_5 = points[y1]
+            point_6 = points[x2]
+            point_7 = points[y2]
+            new_len = np.sqrt((point_5['X'] - point_4['X']) ** 2 + (point_5['Y'] - point_4['Y']) ** 2) + np.sqrt((
+                                                                                                                         point_7[
+                                                                                                                             'X'] -
+                                                                                                                         point_6[
+                                                                                                                             'X']) ** 2 + (
+                                                                                                                         point_7[
+                                                                                                                             'Y'] -
+                                                                                                                         point_6[
+                                                                                                                             'Y']) ** 2)
+            return old_len - new_len
+
+        intermediate_results = []
+        for _ in range(iters):
+            i = random.randint(0, n_points - 3)
+            x1 = order[i]
+            x2 = order[i + 1 % n_points]
+
+            if i == 0:
+                j_limit = n_points - 2
+            else:
+                j_limit = n_points - 1
+
+            j = random.randint(i + 2, j_limit)
+            y1 = order[j]
+            y2 = order[(j + 1) % n_points]
+
+            if gain_from_2_opt_swap(x1, x2, y1, y2) > 0:
+                new_order = np.concatenate((order[:i + 1], order[i + 1:j + 1][::-1], order[j + 1:]))
+                new_distance = Route.total_distance(points, new_order)
+                if new_distance <= best_distance:
+                    order = new_order
+                    best_distance = new_distance
+
+            intermediate_results.append(best_distance)
+
+        return order, best_distance, intermediate_results
+
+    @staticmethod
     def three_opt(points: np.array, n_points: int, order: np.array, iters: int):
         def gain_from_3_opt_swap(x1, x2, y1, y2, z1, z2, opt_recombination):
             old_len = 0
