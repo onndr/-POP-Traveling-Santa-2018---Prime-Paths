@@ -78,7 +78,7 @@ class Route:
 
     @staticmethod
     def two_opt_stat(points: np.array, n_points: int, order: np.array, iters: int):
-        best_distance = Route.total_distance(points, order)
+        best_distance = Route.total_distance(points, order, True)
 
         def gain_from_2_opt_swap(x1, x2, y1, y2):
             point_ = points[x1]

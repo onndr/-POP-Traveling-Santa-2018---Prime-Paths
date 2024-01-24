@@ -18,12 +18,12 @@ from src.constants import *
 
 class PrimePathsProblem:
     def __init__(self):
-        self.inter_chunk_connection_trials = 1500
+        self.inter_chunk_connection_trials = 1000
         self.y_chunks = 15
         self.x_chunks = 15
         self.city_count_restriction = 20000
         self.chunk_start_routes = 5
-        self.chunk_optimization_iters = 50000
+        self.chunk_optimization_iters = 10000
         self.final_opt_routes = 12
         self.final_optimization_iters = 10000000
 
