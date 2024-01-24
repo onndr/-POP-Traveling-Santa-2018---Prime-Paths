@@ -155,10 +155,14 @@ class PrimePathsProblem:
                     q.put(neighbour_pos)
         return initial_route
 
-    def kopt_full_path(self, initial_route: np.array):
+    def kopt_full_path(self, initial_route: np.array = None, initial_routes: list[np.array] = None):
         logging.info("Performing Kopt on initial route")
 
-        processing_data = [initial_route for _ in range(self.final_opt_routes)]
+        processing_data = []
+        if initial_routes is None:
+            processing_data = [initial_route for _ in range(self.final_opt_routes)]
+        else:
+            processing_data = initial_routes
 
         res = []
         with multiprocessing.Pool(processes=multiprocessing.cpu_count()) as pool:
@@ -283,3 +287,19 @@ class PrimePathsProblem:
         for result in results:
             plt.plot(result[2])
         plt.show()
+
+    def solve_2_opt_only(self):
+        self.read_problem_data(self.city_count_restriction)
+        # generate random initial routes
+        initial_routes = [np.array(list(range(self.city_count_restriction))) for _ in range(self.final_opt_routes)]
+        [np.random.shuffle(order) for order in initial_routes]
+
+        with open("[2-opt only]initial_routes_cache.bin", "wb") as file:
+            pickle.dump(initial_routes, file)
+
+        results = self.kopt_full_path(initial_route=None, initial_routes=initial_routes)
+
+        with open("[2-opt only]results_cache.bin", "wb") as file:
+            pickle.dump(results, file)
+
+        self.plot_results(results)
