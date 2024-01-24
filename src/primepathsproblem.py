@@ -1,4 +1,5 @@
 import logging
+import multiprocessing
 import queue
 from typing import Optional
 
@@ -14,11 +15,12 @@ from src.constants import *
 
 class PrimePathsProblem:
     def __init__(self):
-        self.y_chunks = 3
-        self.x_chunks = 3
-        self.city_count_restriction = 250
+        self.inter_chunk_connection_trials = 1000
+        self.y_chunks = 15
+        self.x_chunks = 15
+        self.city_count_restriction = 10000
         self.chunk_start_routes = 5
-        self.chunk_optimization_iters = 20
+        self.chunk_optimization_iters = 100
         self.chunk_space: Optional[ChunkSpace] = None
         self.cities = None
 
@@ -35,18 +37,30 @@ class PrimePathsProblem:
     def create_routes_within_chunks(self):
         logging.info("Creating initial routes within chunks")
         chunk_routes = {}
+
+        processing_data = []
         for x_split in range(self.chunk_space.x_cells):
             for y_split in range(self.chunk_space.y_cells):
                 chunk = self.chunk_space.chunks[x_split, y_split]
                 if chunk is None or len(chunk) == 0:
                     continue
-                chunk_route = Route(chunk)
-                chunk_route.optimize(
-                    Route.three_opt, self.chunk_optimization_iters, self.chunk_start_routes
-                )
-                chunk_route_universal = self.translate_route(chunk_route, chunk)
-                chunk_routes[(x_split, y_split)] = chunk_route_universal
+                processing_data.append((chunk, x_split, y_split))
+
+        result = []
+        with multiprocessing.Pool(processes=multiprocessing.cpu_count()) as pool:
+            result = pool.starmap(self.process_chunk_path, processing_data)
+
+        for chunk_pos, chunk_route_universal in result:
+            chunk_routes[chunk_pos] = chunk_route_universal
         return chunk_routes
+
+    def process_chunk_path(self, chunk, x_split, y_split):
+        logging.info(f"Processing chunk {x_split, y_split}")
+        chunk_route = Route(chunk)
+        chunk_route.optimize(Route.three_opt, self.chunk_optimization_iters, self.chunk_start_routes)
+        chunk_route_universal = self.translate_route(chunk_route, chunk)
+        chunk_pos = (x_split, y_split)
+        return chunk_pos, chunk_route_universal
 
     def create_connections_between_chunks(self, chunk_routes):
         logging.info("Connecting chunks")
@@ -59,6 +73,8 @@ class PrimePathsProblem:
                 if self.chunk_space.chunks[x_split, y_split] is None:
                     logging.info(f"Chunk {this_cell_pos} is empty!")
                     continue
+                else:
+                    logging.info(f"Processing chunk {this_cell_pos}")
                 # neighbour 1
                 this_cell = self.chunk_space.chunks[this_cell_pos]
 
@@ -66,10 +82,11 @@ class PrimePathsProblem:
                     neighbour_pos: ChunkPosType = (x_split + 1, y_split)
                     neighbour_cell = self.chunk_space.chunks[neighbour_pos]
                     if neighbour_cell is not None:
-                        logging.info(f"Neighbour of {this_cell_pos}, {neighbour_pos} is empty!")
                         connection_cost, connection_params = self.get_best_connection(this_cell_pos, neighbour_pos,
                                                                                       chunk_routes)
                         connections[(this_cell_pos, neighbour_pos)] = (connection_cost, connection_params)
+                    else:
+                        logging.info(f"Neighbour of {this_cell_pos}, {neighbour_pos} is empty!")
 
                 # neighbour 2
                 if y_split < self.chunk_space.y_cells - 1:
@@ -79,10 +96,13 @@ class PrimePathsProblem:
                         connection_cost, connection_params = self.get_best_connection(this_cell_pos, neighbour_pos,
                                                                                       chunk_routes)
                         connections[(this_cell_pos, neighbour_pos)] = (connection_cost, connection_params)
+                    else:
+                        logging.info(f"Neighbour of {this_cell_pos}, {neighbour_pos} is empty!")
 
         logging.info("Choosing connection points to form best spanning tree")
         connections_to_keep: list[tuple[ChunkPosType, ChunkPosType]] = find_best_spanning_tree(
-            self.chunk_space.get_graph(), lambda edge: connections[edge][0] if edge in connections else 1e18
+            self.make_graph_from_connections(connections),
+            lambda edge: connections[edge][0] if edge in connections else 1e18
         )
 
         logging.info("Applying connections")
@@ -90,6 +110,8 @@ class PrimePathsProblem:
         initial_route = self.merge_routes_in_order(chunk_routes, connections, connections_to_keep)
 
         # return initial route
+        if len(initial_route) < self.city_count_restriction:
+            logging.error("Missing cities!")
         return initial_route
 
     def merge_routes_in_order(self, chunk_routes, connections, connections_to_keep):
@@ -138,33 +160,54 @@ class PrimePathsProblem:
         neigh_cost = Route.total_distance(self.cities, neighbour_path)
 
         separated_cost = this_cost + neigh_cost
-        best_cost_delta = 0
+        best_cost_delta = 1e18
         best_connection = None
 
-        for this_it, this_city in enumerate(this_path):
-            for neigh_it, neigh_city in enumerate(neighbour_path):
-                this_shifed = np.append(this_path[-this_it:], this_path[:-this_it])
-                neigh_shifed = np.append(neighbour_path[-neigh_it:], neighbour_path[:-neigh_it])
+        processing_data = []
+        for rep in range(self.inter_chunk_connection_trials):
+            processing_data.append([this_path, neighbour_path, separated_cost])
 
-                # 1st possibility, same direction splice
-                final_1 = np.append(this_shifed, neigh_shifed)
-                final_1_dist = Route.total_distance(self.cities, final_1)
-                cost_delta = separated_cost - final_1_dist
-                if cost_delta > best_cost_delta:
-                    best_connection = (this_city, neigh_city, 1)
-                    best_cost_delta = cost_delta
+        res = []
+        with multiprocessing.Pool(processes=multiprocessing.cpu_count()) as pool:
+            res = pool.starmap(self.process_random_connection, processing_data)
 
-                # 2nd possibility, inverded direction
-                final_2 = np.append(this_shifed, np.flip(neigh_shifed))
-                final_2_dist = Route.total_distance(self.cities, final_2)
-                cost_delta = separated_cost - final_2_dist
-                if cost_delta > best_cost_delta:
-                    best_connection = (this_city, neigh_city, -1)
-                    best_cost_delta = cost_delta
+        best_cost_delta, best_connection = min(res)
 
+        if best_connection == None or best_cost_delta == 0:
+            logging.error("Somethin aint right")
         return best_cost_delta, best_connection
 
-    def merge_paths(self, source_route: np.array, dest_route: np.array, source_city: int, dest_city: int, direction: int):
+    def process_random_connection(self, this_path, neighbour_path, separated_cost):
+        this_it = np.random.randint(low=0, high=len(this_path))
+        this_city = this_path[this_it]
+
+        neigh_it = np.random.randint(low=0, high=len(neighbour_path))
+        neigh_city = neighbour_path[neigh_it]
+
+        this_shifed = np.append(this_path[-this_it:], this_path[:-this_it])
+        neigh_shifed = np.append(neighbour_path[-neigh_it:], neighbour_path[:-neigh_it])
+
+        # 1st possibility, same direction splice
+        final_1 = np.append(this_shifed, neigh_shifed)
+        final_1_dist = Route.total_distance(self.cities, final_1)
+        cost_delta = final_1_dist - separated_cost
+
+        local_best_con = (this_city, neigh_city, 1)
+        local_best_cost = cost_delta
+
+        # 2nd possibility, inverded direction
+        final_2 = np.append(this_shifed, np.flip(neigh_shifed))
+        final_2_dist = Route.total_distance(self.cities, final_2)
+        cost_delta = final_2_dist - separated_cost
+
+        if cost_delta < local_best_cost:
+            local_best_con = (this_city, neigh_city, -1)
+            local_best_cost = cost_delta
+
+        return local_best_cost, local_best_con
+
+    def merge_paths(self, source_route: np.array, dest_route: np.array, source_city: int, dest_city: int,
+                    direction: int):
         source_pos = np.where(source_route == source_city)[0][0]
         dest_pos = np.where(dest_route == dest_city)[0][0]
 
@@ -181,3 +224,9 @@ class PrimePathsProblem:
         for relative_index in chunk_route.best_order:
             out.append(chunk[relative_index]["CityId"])
         return np.array(out, dtype=int)
+
+    def make_graph_from_connections(self, connections) -> Graph:
+        g = Graph()
+        for connection in connections:
+            g.add_edge(connection[0], connection[1])
+        return g

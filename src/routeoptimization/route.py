@@ -3,7 +3,6 @@ from typing import Callable
 import numpy as np
 import random
 
-from src.constants import Point_t
 from src.graphtools.graph import Graph
 
 
@@ -18,17 +17,13 @@ class Route:
         self.graph = None
 
     @staticmethod
-    def distance(point1: Point_t, point2: Point_t):
-        return np.sqrt((point2['X'] - point1['X']) ** 2 + (point2['Y'] - point1['Y']) ** 2)
-
-    @staticmethod
     def total_distance(points: np.array, order: np.array, with_primes_penalty: bool = False):
         total = 0
-        for i in range(-1, len(points) - 1):
-            if with_primes_penalty and i % 10 == 0 and not points[order[i]]['prime']:
-                total += Route.distance(points[order[i]], points[order[i + 1]]) * 1.1
-            else:
-                total += Route.distance(points[order[i]], points[order[i + 1]])
+        for i in range(-1, len(order) - 1):
+            point_ = points[order[i]]
+            point_1 = points[order[i + 1]]
+            subtotal = np.sqrt((point_1['X'] - point_['X']) ** 2 + (point_1['Y'] - point_['Y']) ** 2)
+            total += subtotal * 1.1 if with_primes_penalty and i % 10 == 0 and not points[order[i]]['prime'] else subtotal
         return total
 
     @staticmethod
@@ -36,8 +31,26 @@ class Route:
         best_distance = Route.total_distance(points, order)
 
         def gain_from_2_opt_swap(x1, x2, y1, y2):
-            old_len = Route.distance(points[x1], points[x2]) + Route.distance(points[y1], points[y2])
-            new_len = Route.distance(points[x1], points[y1]) + Route.distance(points[x2], points[y2])
+            point_ = points[x1]
+            point_1 = points[x2]
+            point_2 = points[y1]
+            point_3 = points[y2]
+            old_len = np.sqrt((point_1['X'] - point_['X']) ** 2 + (point_1['Y'] - point_['Y']) ** 2) + np.sqrt(
+                (point_3['X'] - point_2['X']) ** 2 + (
+                        point_3['Y'] - point_2['Y']) ** 2)
+            point_4 = points[x1]
+            point_5 = points[y1]
+            point_6 = points[x2]
+            point_7 = points[y2]
+            new_len = np.sqrt((point_5['X'] - point_4['X']) ** 2 + (point_5['Y'] - point_4['Y']) ** 2) + np.sqrt((
+                                                                                                                         point_7[
+                                                                                                                             'X'] -
+                                                                                                                         point_6[
+                                                                                                                             'X']) ** 2 + (
+                                                                                                                         point_7[
+                                                                                                                             'Y'] -
+                                                                                                                         point_6[
+                                                                                                                             'Y']) ** 2)
             return old_len - new_len
 
         for _ in range(iters):
@@ -72,37 +85,109 @@ class Route:
                 case 0:
                     return 0
                 case 1:
-                    old_len = Route.distance(points[x1], points[x2]) + Route.distance(points[z1], points[z2])
-                    new_len = Route.distance(points[x1], points[z1]) + Route.distance(points[x2], points[z2])
+                    point_ = points[x1]
+                    point_1 = points[x2]
+                    point_2 = points[z1]
+                    point_3 = points[z2]
+                    old_len = np.sqrt((point_1['X'] - point_['X']) ** 2 + (point_1['Y'] - point_['Y']) ** 2) + np.sqrt((
+                                                                                                                               point_3[
+                                                                                                                                   'X'] -
+                                                                                                                               point_2[
+                                                                                                                                   'X']) ** 2 + (
+                                                                                                                               point_3[
+                                                                                                                                   'Y'] -
+                                                                                                                               point_2[
+                                                                                                                                   'Y']) ** 2)
+                    point_4 = points[x1]
+                    point_5 = points[z1]
+                    point_6 = points[x2]
+                    point_7 = points[z2]
+                    new_len = np.sqrt((point_5['X'] - point_4['X']) ** 2 + (
+                            point_5['Y'] - point_4['Y']) ** 2) + np.sqrt((point_7['X'] - point_6['X']) ** 2 + (
+                            point_7['Y'] - point_6['Y']) ** 2)
                 case 2:
-                    old_len = Route.distance(points[y1], points[y2]) + Route.distance(points[z1], points[z2])
-                    new_len = Route.distance(points[y1], points[z1]) + Route.distance(points[y2], points[z2])
+                    point_8 = points[y1]
+                    point_9 = points[y2]
+                    point_10 = points[z1]
+                    point_11 = points[z2]
+                    old_len = np.sqrt((point_9['X'] - point_8['X']) ** 2 + (
+                            point_9['Y'] - point_8['Y']) ** 2) + np.sqrt((point_11['X'] - point_10['X']) ** 2 + (
+                            point_11['Y'] - point_10['Y']) ** 2)
+                    point_12 = points[y1]
+                    point_13 = points[z1]
+                    point_14 = points[y2]
+                    point_15 = points[z2]
+                    new_len = np.sqrt((point_13['X'] - point_12['X']) ** 2 + (
+                            point_13['Y'] - point_12['Y']) ** 2) + np.sqrt((point_15['X'] - point_14['X']) ** 2 + (
+                            point_15['Y'] - point_14['Y']) ** 2)
                 case 3:
-                    old_len = Route.distance(points[x1], points[x2]) + Route.distance(points[y1], points[y2])
-                    new_len = Route.distance(points[x1], points[y1]) + Route.distance(points[x2], points[y2])
+                    point_16 = points[x1]
+                    point_17 = points[x2]
+                    point_18 = points[y1]
+                    point_19 = points[y2]
+                    old_len = np.sqrt((point_17['X'] - point_16['X']) ** 2 + (
+                            point_17['Y'] - point_16['Y']) ** 2) + np.sqrt((point_19['X'] - point_18['X']) ** 2 + (
+                            point_19['Y'] - point_18['Y']) ** 2)
+                    point_20 = points[x1]
+                    point_21 = points[y1]
+                    point_22 = points[x2]
+                    point_23 = points[y2]
+                    new_len = np.sqrt((point_21['X'] - point_20['X']) ** 2 + (
+                            point_21['Y'] - point_20['Y']) ** 2) + np.sqrt((point_23['X'] - point_22['X']) ** 2 + (
+                            point_23['Y'] - point_22['Y']) ** 2)
                 case 4:
-                    new_len = (Route.distance(points[x1], points[y1]) +
-                               Route.distance(points[x2], points[z1]) +
-                               Route.distance(points[y2], points[z2]))
+                    point_24 = points[x1]
+                    point_25 = points[y1]
+                    point_26 = points[x2]
+                    point_27 = points[z1]
+                    point_28 = points[y2]
+                    point_29 = points[z2]
+                    new_len = (np.sqrt((point_25['X'] - point_24['X']) ** 2 + (point_25['Y'] - point_24['Y']) ** 2) +
+                               np.sqrt((point_27['X'] - point_26['X']) ** 2 + (point_27['Y'] - point_26['Y']) ** 2) +
+                               np.sqrt((point_29['X'] - point_28['X']) ** 2 + (point_29['Y'] - point_28['Y']) ** 2))
                 case 5:
-                    new_len = (Route.distance(points[x1], points[z1]) +
-                               Route.distance(points[y2], points[x2]) +
-                               Route.distance(points[y1], points[z2]))
+                    point_30 = points[x1]
+                    point_31 = points[z1]
+                    point_32 = points[y2]
+                    point_33 = points[x2]
+                    point_34 = points[y1]
+                    point_35 = points[z2]
+                    new_len = (np.sqrt((point_31['X'] - point_30['X']) ** 2 + (point_31['Y'] - point_30['Y']) ** 2) +
+                               np.sqrt((point_33['X'] - point_32['X']) ** 2 + (point_33['Y'] - point_32['Y']) ** 2) +
+                               np.sqrt((point_35['X'] - point_34['X']) ** 2 + (point_35['Y'] - point_34['Y']) ** 2))
                 case 6:
-                    new_len = (Route.distance(points[x1], points[y2]) +
-                               Route.distance(points[z1], points[y1]) +
-                               Route.distance(points[x2], points[z2]))
+                    point_36 = points[x1]
+                    point_37 = points[y2]
+                    point_38 = points[z1]
+                    point_39 = points[y1]
+                    point_40 = points[x2]
+                    point_41 = points[z2]
+                    new_len = (np.sqrt((point_37['X'] - point_36['X']) ** 2 + (point_37['Y'] - point_36['Y']) ** 2) +
+                               np.sqrt((point_39['X'] - point_38['X']) ** 2 + (point_39['Y'] - point_38['Y']) ** 2) +
+                               np.sqrt((point_41['X'] - point_40['X']) ** 2 + (point_41['Y'] - point_40['Y']) ** 2))
                 case 7:
-                    new_len = (Route.distance(points[x1], points[y2]) +
-                               Route.distance(points[z1], points[x2]) +
-                               Route.distance(points[y1], points[z2]))
+                    point_42 = points[x1]
+                    point_43 = points[y2]
+                    point_44 = points[z1]
+                    point_45 = points[x2]
+                    point_46 = points[y1]
+                    point_47 = points[z2]
+                    new_len = (np.sqrt((point_43['X'] - point_42['X']) ** 2 + (point_43['Y'] - point_42['Y']) ** 2) +
+                               np.sqrt((point_45['X'] - point_44['X']) ** 2 + (point_45['Y'] - point_44['Y']) ** 2) +
+                               np.sqrt((point_47['X'] - point_46['X']) ** 2 + (point_47['Y'] - point_46['Y']) ** 2))
                 case _:
                     raise ValueError("Invalid opt_recombination value")
 
             if opt_recombination in [4, 5, 6, 7]:
-                old_len = (Route.distance(points[x1], points[x2]) +
-                           Route.distance(points[y1], points[y2]) +
-                           Route.distance(points[z1], points[z2]))
+                point_48 = points[x1]
+                point_49 = points[x2]
+                point_50 = points[y1]
+                point_51 = points[y2]
+                point_52 = points[z1]
+                point_53 = points[z2]
+                old_len = (np.sqrt((point_49['X'] - point_48['X']) ** 2 + (point_49['Y'] - point_48['Y']) ** 2) +
+                           np.sqrt((point_51['X'] - point_50['X']) ** 2 + (point_51['Y'] - point_50['Y']) ** 2) +
+                           np.sqrt((point_53['X'] - point_52['X']) ** 2 + (point_53['Y'] - point_52['Y']) ** 2))
 
             return old_len - new_len
 
